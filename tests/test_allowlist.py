@@ -8,6 +8,26 @@ def test_parse_empty_raises():
         parse_allowed_channels("")
 
 
+def test_parse_wildcard_allows_everything():
+    allowlist = parse_allowed_channels("*")
+    assert allowlist.allow_all is True
+    assert allowlist.is_allowed(channel_id="C_whatever")
+    assert allowlist.is_allowed(name="#anything")
+    assert allowlist.is_allowed()
+
+
+def test_wildcard_wins_even_mixed_with_other_tokens():
+    allowlist = parse_allowed_channels("#general, *")
+    assert allowlist.allow_all is True
+    assert allowlist.is_allowed(channel_id="C999")
+
+
+def test_non_wildcard_is_not_allow_all():
+    allowlist = parse_allowed_channels("#general")
+    assert allowlist.allow_all is False
+    assert not allowlist.is_allowed(channel_id="C999")
+
+
 def test_parse_whitespace_only_raises():
     with pytest.raises(ValueError, match="SLACK_ALLOWED_CHANNELS"):
         parse_allowed_channels("  ,  ")
