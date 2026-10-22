@@ -54,18 +54,25 @@ def _pick_team(config: dict[str, Any]) -> tuple[str, str]:
     raise RuntimeError("No workspace token found in Slack localConfig")
 
 
-async def _wait_for_token(page, timeout_s: int) -> tuple[str, str]:
+_READ_CONFIG = (
+    "() => { try { return window.localStorage.getItem('localConfig_v2'); }"
+    " catch (e) { return null; } }"
+)
+
+
+async def _wait_for_token(context, timeout_s: int) -> tuple[str, str]:
     for _ in range(timeout_s):
-        raw = await page.evaluate(
-            "() => window.localStorage.getItem('localConfig_v2')"
-        )
-        if raw:
+        for page in list(context.pages):
             try:
-                config = json.loads(raw)
-                return _pick_team(config)
-            except (json.JSONDecodeError, RuntimeError):
-                pass
-        await page.wait_for_timeout(1000)
+                raw = await page.evaluate(_READ_CONFIG)
+            except Exception:  # noqa: BLE001 - page navigates during sign-in; retry
+                continue
+            if raw:
+                try:
+                    return _pick_team(json.loads(raw))
+                except (json.JSONDecodeError, RuntimeError):
+                    pass
+        await asyncio.sleep(1)
     raise RuntimeError(
         f"Timed out after {timeout_s}s waiting for Slack sign-in in the browser."
     )
@@ -119,7 +126,7 @@ async def _extract(timeout_s: int) -> tuple[str, str, str]:
                 "A browser window opened. Sign in to Slack if needed; "
                 "waiting for the session..."
             )
-            token, team = await _wait_for_token(page, timeout_s)
+            token, team = await _wait_for_token(context, timeout_s)
             d_cookie = await _get_d_cookie(context)
             return token, team, d_cookie
         finally:
