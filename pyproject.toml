@@ -14,9 +14,13 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
 ]
+browser = [
+    "playwright>=1.40.0",
+]
 
 [project.scripts]
 slack-readonly-mcp = "slack_readonly_mcp.server:main"
+slack-readonly-login = "slack_readonly_mcp.browserlogin:main"
 slack-readonly-whoami = "slack_readonly_mcp.login:main"
 
 [build-system]

@@ -5,6 +5,8 @@ from typing import Any
 
 import httpx
 
+from slack_readonly_mcp.credentials import load_credentials
+
 
 class SlackApiError(RuntimeError):
     """Raised when the Slack web API returns ok=false."""
@@ -41,14 +43,29 @@ class SlackWebClient:
 
 
 def build_client() -> SlackWebClient:
+    """Build a client from env vars, falling back to saved credentials.
+
+    Env (SLACK_XOXC_TOKEN / SLACK_XOXD_COOKIE) wins; otherwise the file written
+    by `slack-readonly-login` is used. If neither is present, instruct the user
+    to run the browser login.
+    """
     token = os.environ.get("SLACK_XOXC_TOKEN", "").strip()
     d_cookie = os.environ.get("SLACK_XOXD_COOKIE", "").strip()
-    base_url = os.environ.get("SLACK_BASE_URL", "https://slack.com/api").strip()
+    base_url = os.environ.get("SLACK_BASE_URL", "").strip()
+
+    if not token or not d_cookie:
+        saved = load_credentials()
+        if saved:
+            token = token or saved.get("token", "").strip()
+            d_cookie = d_cookie or saved.get("d_cookie", "").strip()
+            base_url = base_url or (saved.get("base_url") or "").strip()
+
+    base_url = base_url or "https://slack.com/api"
 
     if not token or not d_cookie:
         raise RuntimeError(
-            "SLACK_XOXC_TOKEN and SLACK_XOXD_COOKIE are required "
-            "(see README: how to extract them from your browser session)."
+            "No Slack credentials. Run `slack-readonly-login` to sign in via the "
+            "browser, or set SLACK_XOXC_TOKEN and SLACK_XOXD_COOKIE."
         )
 
     return SlackWebClient(token=token, d_cookie=d_cookie, base_url=base_url)
